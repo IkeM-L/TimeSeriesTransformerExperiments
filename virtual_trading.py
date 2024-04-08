@@ -115,6 +115,10 @@ def print_buy_and_hold_benchmark(stock_data, initial_capital, last_date_in_train
 # Main function
 
 def main():
+    """
+    The main function to execute the virtual trading simulation.
+    :return:
+    """
     training_data_filename = "sp500_stock_data_last_day.csv"
     testing_filename = "sp500_stock_data_jan_and_feb.csv"
     start_date, end_date, last_date_in_training_data = "2023-01-01", "2023-03-01", "2023-01-30"
