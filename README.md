@@ -1,4 +1,4 @@
-# A transformer model that predicts the next value of multiple, related, time series
+# A transformer model that predicts the next values of multiple, related, time series
 
 ## To run the model
 1. Install the required packages listed in `requirements.txt`
