@@ -1,0 +1,6 @@
+numpy
+torch
+transformers
+pandas
+yfinance
+scikit-learn
