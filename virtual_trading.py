@@ -8,20 +8,36 @@ from test_model import load_model, load_scaler, predict_price, prepare_data_for_
 # Data loading and preparation functions
 
 def load_stock_data(tickers, start_date, end_date, filename):
-    """Ensure stock data is downloaded and loaded from CSV."""
+    """
+    Ensure stock data is downloaded and loaded from CSV.
+    :param tickers: A list of stock tickers to download data for
+    :param start_date: The start date for the data
+    :param end_date: The end date for the data
+    :param filename: The filename to save the data to
+    :return: A DataFrame containing the stock data
+    """
     if not os.path.isfile(filename):
         download_stock_data(tickers, start_date, end_date, filename)
     return pd.read_csv(filename, header=[0, 1], index_col=0, parse_dates=True)
 
 
 def get_tickers_from_last_day(filename):
-    """Extract tickers from the last day of available training data."""
+    """
+    Extract tickers from the last day of available training data.
+    :param filename: The filename containing the last day of training data
+    :return: A list of tickers from the last day of training data
+    """
     df_last_day = pd.read_csv(filename, header=[0, 1], index_col=0, parse_dates=True)
     return df_last_day.xs('Close', level=1, axis=1).dropna(axis=1).columns.get_level_values(0).tolist()
 
 
 def get_actual_prices(stock_data, index):
-    """Get actual open and close prices for trading day."""
+    """
+    Get actual open and close prices for trading day.
+    :param stock_data: The stock data DataFrame
+    :param index: The index of the trading day
+    :return: The actual open and close prices for the trading day
+    """
     open_prices = stock_data.xs('Open', level=1, axis=1).iloc[index].values
     close_prices = stock_data.xs('Close', level=1, axis=1).iloc[index].values
     return zip(open_prices, close_prices)
@@ -30,10 +46,25 @@ def get_actual_prices(stock_data, index):
 
 
 def prepare_and_predict(stock_data, i, seq_length, model, scaler, device, tickers):
-    """Prepare data for prediction and predict next day's prices."""
+    """
+    Prepare data for prediction and predict next day's prices.
+    :param stock_data: The stock data DataFrame
+    :param i: The index of the trading day
+    :param seq_length: The sequence length used for prediction
+    :param model: The PyTorch model for prediction
+    :param scaler: The MinMaxScaler object used for scaling data
+    :param device: The device to run the model on
+    :param tickers: The list of stock tickers
+    :return: The recent data, actual prices, and predicted prices
+    """
+
+    # Extract the Close prices of recent data for prediction, drop any columns with NaN values
     recent_data = stock_data.iloc[i:i + seq_length].xs('Close', level=1, axis=1).dropna(axis=1).values
+    # Convert the recent data to a PyTorch tensor for prediction
     recent_sequence_tensor = prepare_data_for_prediction(recent_data, scaler, device)
+    # Predict the next day's prices using the model
     predicted_prices = predict_price(model, recent_sequence_tensor, scaler, device)
+    # Get the actual open and close prices for the trading day to compare with predictions
     actual_prices = get_actual_prices(stock_data, i + seq_length)
     return recent_data, actual_prices, predicted_prices
 
@@ -41,7 +72,14 @@ def prepare_and_predict(stock_data, i, seq_length, model, scaler, device, ticker
 
 
 def trade(predicted_prices, actual_prices, capital):
-    """Calculate profit/loss from trading based on predictions."""
+    """
+    Calculate profit/loss from trading based on predictions.
+
+    :param predicted_prices: The predicted prices for the trading day
+    :param actual_prices: The actual open and close prices for the trading day
+    :param capital: The current capital available for trading
+    :return: The updated capital, number of profitable trades, and total trades made
+    """
     profitable_trades, total_trades = 0, 0
     for predicted, (actual_open, actual_close) in zip(predicted_prices, actual_prices):
         if predicted > actual_open:
@@ -54,7 +92,25 @@ def trade(predicted_prices, actual_prices, capital):
 
 
 def execute_trades(stock_data, model, scaler, device, seq_length, tickers, initial_capital, last_date_in_training_data):
-    """Execute trades based on model predictions and update capital."""
+    """
+    Execute trades based on model predictions and update capital.
+
+    We use a very simple strategy here: buy if the predicted price is higher than the actual open price, and sell at the
+    actual close price. We assume that we can buy/sell at the open/close prices and ignore other factors like slippage,
+    transaction costs, etc.
+    We also do not try to short stocks
+    We spend an equal amount on each stock, so the capital is divided equally among the stocks that are bought.
+    :param stock_data: The stock data DataFrame
+    :param model: The PyTorch model for prediction
+    :param scaler: The MinMaxScaler object used for scaling data
+    :param device: The device to run the model on
+    :param seq_length: The sequence length used for prediction
+    :param tickers: The list of stock tickers we are trading
+    :param initial_capital: The initial capital available for trading
+    :param last_date_in_training_data: The last date in the training data
+    :return: The final capital after trading
+    """
+
     capital = initial_capital
     profitable_trades, total_trades = 0, 0
 
@@ -62,11 +118,15 @@ def execute_trades(stock_data, model, scaler, device, seq_length, tickers, initi
     start_index = stock_data.index.get_loc(last_date_in_training_data) + 1 - seq_length
 
     for i in range(start_index, len(stock_data) - seq_length):
+        # Prepare and predict the next day's prices
         recent_data, actual_prices, predicted_prices = prepare_and_predict(stock_data, i, seq_length, model, scaler,
                                                                            device, tickers)
+        # Execute trades based on predictions and update capital
         capital, profitable, total = trade(predicted_prices, actual_prices, capital)
+        # Update total profitable trades and total trades made
         profitable_trades += profitable
         total_trades += total
+        # Print results for the day
         print_day_results(stock_data.index[i + seq_length], capital, profitable, total)
     return capital
 
