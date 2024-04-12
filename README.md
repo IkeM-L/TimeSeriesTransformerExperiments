@@ -13,6 +13,7 @@
 4. Run the ``virtual_trading.py`` script to simulate trading based on the model's predictions
    - This will simulate trading in February based on the data from January with default parameters
    - Note: Yahoo Finance data seems to update at EOM for some stocks, so setting the end data to any day in the current month will not work
+   - Note: You will have to run ``python split_data.py`` the first time you run this script to generate the data
    
 
 ## Additional information
